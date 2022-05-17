@@ -1,11 +1,11 @@
 apiVersion: troubleshoot.sh/v1beta2
 kind: SupportBundle
 metadata:
-  name: my-application-name
+  name: Kyma Eventing
 spec:
   collectors:
-    # - clusterInfo: {}
-    # - clusterResources: {}
+    - clusterInfo: {}
+    - clusterResources: {}
     - logs:
         collectorName: logs eventing controller
         selector:
@@ -34,7 +34,8 @@ spec:
         includeValue: true
         key: namespace
         includeAllData: true
-        exclude: true
+        # exclude: true
+  analyzers:
     - customResourceDefinition:
         collectorName: eventing subscription CRD
         customResourceDefinitionName: subscriptions.eventing.kyma-project.io
@@ -51,43 +52,36 @@ spec:
               message: EventingBackend is required for eventing. EventingBackend was not found in the cluster.
           - pass:
               message: Found a supported version of EventingBackend installed and running in the cluster.
-  analyzers:
     - textAnalyze:
         checkName: invalid sink
         fileName: eventing-controller*/controller.log
-        regexGroups: '"name":\s*"(?P<SubName>[^"]+).*namespace":"(?P<Namespace>[^"]+)".*error":"(?P<Error>.*)"'
+        regexGroups: '"name":\s*"(?P<SubName>.*?)".*namespace":"(?P<Namespace>.*?)".*error":"(?P<Error>sink is not valid cluster local svc.*?)"'
         outcomes:
           - pass:
-              when: "false"
               message: "No problem with any sink in a Subscription"
+              when: 'Error == ""'
           - fail:
-              when: "true"
-              # message: 'Problem with sink in Subscription {{ .SubName }} in namespace {{ .Namespace }}'
-              message: 'Problem with sink in any Subscription'
+              message: "Problem with sink in Subscription {{ .SubName }} in namespace {{ .Namespace }}"
     - textAnalyze:
         checkName: eventTypePrefix
         fileName: eventing-controller*/controller.log
-        regex: 'prefix not found'
+        regexGroups: '"name":\s*"(?P<SubName>.*?)".*namespace":\s*"(?P<Namespace>.*?)".*error":\s*.*"(?P<Error>prefix not found.*?)"'
         outcomes:
           - pass:
-              when: "false"
+              when: 'Error == ""'
               message: "No problem with eventTypePrefix"
           - fail:
-              when: "true"
-              message: "Problem with eventTypePrefix"
+              message: "Problem with eventType in Subscription {{ .SubName }} in namespace {{ .Namespace }}"
     - textAnalyze:
         checkName: BEB EventSource is wrong
         fileName: eventing-controller*/controller.log
-        regex: 'create subscription failed: 403; 403 Forbidden'
-        # regexGroups: '"name":\s*"(?P<SubName>\s+)"'
+        regexGroups: '"name":\s*"(?P<SubName>.*?)".*namespace":\s*"(?P<Namespace>.*?)".*error":\s*.*"(?P<Error>Not authorized to create queue-subscription.*?)"'
         outcomes:
           - pass:
-              when: "false"
+              when: 'Error == ""'
               message: "No problem with eventSource on any Subscription"
           - fail:
-              when: "true"
-              # message: 'There is a problem with the eventSource of Subscription {{ .SubName }}'
-              message: 'There is a problem with the eventSource of a Subscription'
+              message: 'There is a problem with the eventSource of Subscription {{ .SubName }} in namespace {{ .Namespace }}'
     - clusterPodStatuses:
         name: unhealthy
         namespaces:

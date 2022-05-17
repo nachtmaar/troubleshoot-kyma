@@ -1,7 +1,7 @@
 apiVersion: troubleshoot.sh/v1beta2
 kind: Preflight
 metadata:
-  name: preflight-tutorial
+  name: Kyma
 spec:
   analyzers:
     - clusterVersion:
@@ -21,6 +21,6 @@ spec:
         outcomes:
           - fail:
               when: "count() < 2"
-              message: This application requires at least 2 nodes
+              message: This application requires at least 3 nodes
           - pass:
               message: This cluster has enough nodes.
