@@ -1,0 +1,119 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: SupportBundle
+metadata:
+  name: my-application-name
+spec:
+  collectors:
+    # - clusterInfo: {}
+    # - clusterResources: {}
+    - logs:
+        collectorName: logs eventing controller
+        selector:
+          - app.kubernetes.io/instance=eventing,app.kubernetes.io/name=controller
+        namespace: kyma-system
+        limits:
+          maxAge: 24h
+          maxLines: 1000
+    - logs:
+        collectorName: logs epp
+        selector:
+          - app.kubernetes.io/name=eventing-publisher-proxy
+        namespace: kyma-system
+        limits:
+          maxAge: 24h
+          maxLines: 1000
+    - configMap:
+        collectorName: eventing config
+        namespace: kyma-system
+        name: eventing
+        includeAllData: true
+    - secret:
+        collectorName: eventing secret
+        selector:
+          - kyma-project.io/eventing-backend=beb
+        includeValue: true
+        key: namespace
+        includeAllData: true
+        exclude: true
+    - customResourceDefinition:
+        collectorName: eventing subscription CRD
+        customResourceDefinitionName: subscriptions.eventing.kyma-project.io
+        outcomes:
+          - fail:
+              message: Subscription is required for eventing. Subscription was not found in the cluster.
+          - pass:
+              message: Found a supported version of Subscription installed and running in the cluster.
+    - customResourceDefinition:
+        collectorName: eventing eventingbackend CRD
+        customResourceDefinitionName: eventingbackends.eventing.kyma-project.io
+        outcomes:
+          - fail:
+              message: EventingBackend is required for eventing. EventingBackend was not found in the cluster.
+          - pass:
+              message: Found a supported version of EventingBackend installed and running in the cluster.
+  analyzers:
+    - textAnalyze:
+        checkName: invalid sink
+        fileName: eventing-controller*/controller.log
+        regexGroups: '"name":\s*"(?P<SubName>[^"]+).*namespace":"(?P<Namespace>[^"]+)".*error":"(?P<Error>.*)"'
+        outcomes:
+          - pass:
+              when: "false"
+              message: "No problem with any sink in a Subscription"
+          - fail:
+              when: "true"
+              # message: 'Problem with sink in Subscription {{ .SubName }} in namespace {{ .Namespace }}'
+              message: 'Problem with sink in any Subscription'
+    - textAnalyze:
+        checkName: eventTypePrefix
+        fileName: eventing-controller*/controller.log
+        regex: 'prefix not found'
+        outcomes:
+          - pass:
+              when: "false"
+              message: "No problem with eventTypePrefix"
+          - fail:
+              when: "true"
+              message: "Problem with eventTypePrefix"
+    - textAnalyze:
+        checkName: BEB EventSource is wrong
+        fileName: eventing-controller*/controller.log
+        regex: 'create subscription failed: 403; 403 Forbidden'
+        # regexGroups: '"name":\s*"(?P<SubName>\s+)"'
+        outcomes:
+          - pass:
+              when: "false"
+              message: "No problem with eventSource on any Subscription"
+          - fail:
+              when: "true"
+              # message: 'There is a problem with the eventSource of Subscription {{ .SubName }}'
+              message: 'There is a problem with the eventSource of a Subscription'
+    - clusterPodStatuses:
+        name: unhealthy
+        namespaces:
+          - kyma-system
+        outcomes:
+          - fail:
+              when: "== CrashLoopBackOff"
+              message: Pod {{ .Namespace }}/{{ .Name }} is in a CrashLoopBackOff state.
+          - fail:
+              when: "== ImagePullBackOff"
+              message: Pod {{ .Namespace }}/{{ .Name }} is in a ImagePullBackOff state.
+          - fail:
+              when: "== Pending"
+              message: Pod {{ .Namespace }}/{{ .Name }} is in a Pending state.
+          - fail:
+              when: "== Evicted"
+              message: Pod {{ .Namespace }}/{{ .Name }} is in a Evicted state.
+          - fail:
+              when: "== Terminating"
+              message: Pod {{ .Namespace }}/{{ .Name }} is in a Terminating state.
+          - fail:
+              when: "== Init:Error"
+              message: Pod {{ .Namespace }}/{{ .Name }} is in an Init:Error state.
+          - fail:
+              when: "== Init:CrashLoopBackOff"
+              message: Pod {{ .Namespace }}/{{ .Name }} is in an Init:CrashLoopBackOff state.
+          - fail:
+              when: "!= Healthy" # Catch all unhealthy pods. A pod is considered healthy if it has a status of Completed, or Running and all of its containers are ready.
+              message: Pod {{ .Namespace }}/{{ .Name }} is unhealthy with a status of {{ .Status.Reason }}.

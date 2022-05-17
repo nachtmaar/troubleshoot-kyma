@@ -1,0 +1,26 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: Preflight
+metadata:
+  name: preflight-tutorial
+spec:
+  analyzers:
+    - clusterVersion:
+        outcomes:
+          - fail:
+              when: "<= 1.20.0"
+              message: The application requires at least Kubernetes 1.20.0.
+              uri: https://kubernetes.io
+          - warn:
+              when: "> 1.21.0"
+              message: The kubernetes version is too new.
+              uri: https://kubernetes.io
+          - pass:
+              message: Your cluster meets the recommended and required versions of Kubernetes.
+    - nodeResources:
+        checkName: Must have at least 2 nodes in the cluster
+        outcomes:
+          - fail:
+              when: "count() < 2"
+              message: This application requires at least 2 nodes
+          - pass:
+              message: This cluster has enough nodes.
