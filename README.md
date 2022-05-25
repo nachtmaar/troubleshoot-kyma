@@ -49,4 +49,5 @@ export KUBECONFIG=/var/folders/g2/XXXXXXXXXXX/T/local-kubeconfig-XXXXX
 ## Links
 
 <https://github.com/replicatedhq/troubleshoot>
+
 <https://troubleshoot.sh/docs/>
